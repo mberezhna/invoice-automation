@@ -205,3 +205,31 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+*.db-journal
+.venv/
+.env
+.DS_Store
+
+# --- Backend specific ---
+backend/invoices.db
+backend/uploads/*
+!backend/uploads/.gitkeep   # оставляем пустышку, чтобы папка не пропала
+
+# --- Node / Frontend ---
+node_modules/
+dist/
+build/
+*.log
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
