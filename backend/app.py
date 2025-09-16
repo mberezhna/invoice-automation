@@ -1,5 +1,4 @@
-# backend/app.py
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, request, send_from_directory
 from datetime import date, datetime
 import os
 from werkzeug.utils import secure_filename
@@ -17,6 +16,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 _seed_done = False
 
+
 def serialize(i: Invoice) -> dict:
     return {
         "id": i.id,
@@ -29,18 +29,18 @@ def serialize(i: Invoice) -> dict:
         "pdf_path": i.pdf_path,
     }
 
+
 @app.route("/")
 def home():
     return {"message": "Hello from Flask!"}
 
-# --------- LIST with filters + sort + pagination (server-side) ---------
+
 @app.route("/invoices", methods=["GET"])
 def get_invoices():
     session = SessionLocal()
     try:
         q = session.query(Invoice)
 
-        # filters
         inv_no = request.args.get("invoice_number")
         client = request.args.get("client")
         status = request.args.get("status")
@@ -76,10 +76,8 @@ def get_invoices():
             except ValueError:
                 return {"error": "max_amount must be a number"}, 400
 
-        # total BEFORE pagination
         total = q.count()
 
-        # sorting
         sort  = request.args.get("sort", "id")
         order = request.args.get("order", "asc")
         allowed = {
@@ -94,7 +92,6 @@ def get_invoices():
         col = allowed.get(sort, Invoice.id)
         q = q.order_by(asc(col) if order != "desc" else desc(col))
 
-        # pagination
         try:
             page  = max(1, int(request.args.get("page", 1)))
             limit = int(request.args.get("limit", 10))
@@ -109,6 +106,7 @@ def get_invoices():
     finally:
         session.close()
 
+
 @app.route("/invoices/<int:invoice_id>", methods=["GET"])
 def get_invoice(invoice_id: int):
     session = SessionLocal()
@@ -119,6 +117,7 @@ def get_invoice(invoice_id: int):
         return serialize(inv)
     finally:
         session.close()
+
 
 @app.route("/invoices", methods=["POST"])
 def create_invoice():
@@ -131,11 +130,15 @@ def create_invoice():
     issue_date = None
     due_date   = None
     if data.get("issue_date"):
-        try: issue_date = datetime.fromisoformat(data["issue_date"]).date()
-        except ValueError: return {"error": "issue_date must be YYYY-MM-DD"}, 400
+        try:
+            issue_date = datetime.fromisoformat(data["issue_date"]).date()
+        except ValueError:
+            return {"error": "issue_date must be YYYY-MM-DD"}, 400
     if data.get("due_date"):
-        try: due_date = datetime.fromisoformat(data["due_date"]).date()
-        except ValueError: return {"error": "due_date must be YYYY-MM-DD"}, 400
+        try:
+            due_date = datetime.fromisoformat(data["due_date"]).date()
+        except ValueError:
+            return {"error": "due_date must be YYYY-MM-DD"}, 400
 
     allowed_status = {"unpaid", "paid", "overdue"}
     if data["status"] not in allowed_status:
@@ -159,6 +162,7 @@ def create_invoice():
     finally:
         session.close()
 
+
 @app.route("/invoices/<int:invoice_id>", methods=["PATCH"])
 def update_invoice(invoice_id: int):
     data = request.get_json(silent=True) or {}
@@ -168,32 +172,42 @@ def update_invoice(invoice_id: int):
         if not inv:
             return {"error": "Invoice not found"}, 404
 
-        if "invoice_number" in data: inv.invoice_number = data["invoice_number"]
-        if "client_name"   in data: inv.client_name   = data["client_name"]
-        if "amount"        in data: inv.amount        = float(data["amount"])
-        if "status"        in data:
+        if "invoice_number" in data:
+            inv.invoice_number = data["invoice_number"]
+        if "client_name" in data:
+            inv.client_name = data["client_name"]
+        if "amount" in data:
+            inv.amount = float(data["amount"])
+        if "status" in data:
             allowed = {"unpaid", "paid", "overdue"}
             if data["status"] not in allowed:
                 return {"error": f"Invalid status. Allowed: {', '.join(sorted(allowed))}"}, 400
             inv.status = data["status"]
 
         if "issue_date" in data:
-            if data["issue_date"] is None: inv.issue_date = None
+            if data["issue_date"] is None:
+                inv.issue_date = None
             else:
-                try: inv.issue_date = datetime.fromisoformat(data["issue_date"]).date()
-                except ValueError: return {"error": "issue_date must be YYYY-MM-DD"}, 400
+                try:
+                    inv.issue_date = datetime.fromisoformat(data["issue_date"]).date()
+                except ValueError:
+                    return {"error": "issue_date must be YYYY-MM-DD"}, 400
 
         if "due_date" in data:
-            if data["due_date"] is None: inv.due_date = None
+            if data["due_date"] is None:
+                inv.due_date = None
             else:
-                try: inv.due_date = datetime.fromisoformat(data["due_date"]).date()
-                except ValueError: return {"error": "due_date must be YYYY-MM-DD"}, 400
+                try:
+                    inv.due_date = datetime.fromisoformat(data["due_date"]).date()
+                except ValueError:
+                    return {"error": "due_date must be YYYY-MM-DD"}, 400
 
         session.commit()
         session.refresh(inv)
         return serialize(inv)
     finally:
         session.close()
+
 
 @app.route("/invoices/<int:invoice_id>", methods=["DELETE"])
 def delete_invoice(invoice_id: int):
@@ -202,9 +216,13 @@ def delete_invoice(invoice_id: int):
         inv = session.get(Invoice, invoice_id)
         if not inv:
             return {"error": "Invoice not found"}, 404
+
         if inv.pdf_path:
-            try: os.remove(os.path.join(os.path.dirname(__file__), inv.pdf_path))
-            except FileNotFoundError: pass
+            try:
+                os.remove(os.path.join(os.path.dirname(__file__), inv.pdf_path))
+            except FileNotFoundError:
+                pass
+
         session.delete(inv)
         session.commit()
         return {"message": f"Invoice {invoice_id} deleted"}
@@ -213,19 +231,31 @@ def delete_invoice(invoice_id: int):
 
 @app.route("/invoices/<int:invoice_id>/upload-pdf", methods=["POST"])
 def upload_invoice_pdf(invoice_id: int):
-    if "file" not in request.files: return {"error": "No file field provided"}, 400
+    if "file" not in request.files:
+        return {"error": "No file field provided"}, 400
     file = request.files["file"]
-    if file.filename == "": return {"error": "Empty filename"}, 400
+    if not file.filename:
+        return {"error": "Empty filename"}, 400
+    if not file.filename.lower().endswith(".pdf"):
+        return {"error": "Only PDF allowed"}, 400
 
     fname = secure_filename(file.filename)
     save_as = f"invoice-{invoice_id}-{fname}"
     abs_path = os.path.join(UPLOAD_DIR, save_as)
-    file.save(abs_path)
 
     session = SessionLocal()
     try:
         inv = session.get(Invoice, invoice_id)
-        if not inv: return {"error": "Invoice not found"}, 404
+        if not inv:
+            return {"error": "Invoice not found"}, 404
+
+        if inv.pdf_path:
+            try:
+                os.remove(os.path.join(os.path.dirname(__file__), inv.pdf_path))
+            except FileNotFoundError:
+                pass
+
+        file.save(abs_path)
         inv.pdf_path = f"uploads/{save_as}"
         session.commit()
         session.refresh(inv)
@@ -233,23 +263,53 @@ def upload_invoice_pdf(invoice_id: int):
     finally:
         session.close()
 
+
+@app.route("/invoices/<int:invoice_id>/pdf", methods=["DELETE"])
+def delete_invoice_pdf(invoice_id: int):
+    session = SessionLocal()
+    try:
+        inv = session.get(Invoice, invoice_id)
+        if not inv:
+            return {"error": "Invoice not found"}, 404
+        if not inv.pdf_path:
+            return {"message": "Nothing to delete"}, 200
+
+        try:
+            os.remove(os.path.join(os.path.dirname(__file__), inv.pdf_path))
+        except FileNotFoundError:
+            pass
+
+        inv.pdf_path = None
+        session.commit()
+        session.refresh(inv)
+        return serialize(inv)
+    finally:
+        session.close()
+
+
 @app.route("/invoices/<int:invoice_id>/pdf", methods=["GET"])
 def get_invoice_pdf(invoice_id: int):
     session = SessionLocal()
     try:
         inv = session.get(Invoice, invoice_id)
-        if not inv: return {"error": "Invoice not found"}, 404
-        if not inv.pdf_path: return {"error": "PDF not uploaded"}, 404
+        if not inv:
+            return {"error": "Invoice not found"}, 404
+        if not inv.pdf_path:
+            return {"error": "PDF not uploaded"}, 404
+
         directory = os.path.dirname(__file__)
-        folder, filename = os.path.split(inv.pdf_path)  # "uploads/xxx.pdf"
-        return send_from_directory(os.path.join(directory, folder), filename, mimetype="application/pdf")
+        folder, filename = os.path.split(inv.pdf_path) 
+        return send_from_directory(os.path.join(directory, folder), filename,
+                                   mimetype="application/pdf")
     finally:
         session.close()
+
 
 @app.before_request
 def seed_once():
     global _seed_done
-    if _seed_done: return
+    if _seed_done:
+        return
     session = SessionLocal()
     try:
         if session.query(Invoice).count() == 0:
@@ -265,6 +325,7 @@ def seed_once():
         _seed_done = True
     finally:
         session.close()
+
 
 if __name__ == "__main__":
     app.run(debug=True)

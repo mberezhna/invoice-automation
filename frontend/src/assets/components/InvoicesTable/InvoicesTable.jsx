@@ -11,7 +11,25 @@ export default function InvoicesTable({
   onEdit, onDelete
 }) {
   const columns = [
-    { field: "id", headerName: "ID", width: 60 },
+     {
+      field: "rowNumber",
+      headerName: "#",
+      width: 60,
+      sortable: false,
+      filterable: false,
+      align: "center",
+      headerAlign: "center",
+      renderCell: (params) => {
+        const api = params.api;
+        if (typeof api.getRowIndexRelativeToVisibleRows === "function") {
+          return api.getRowIndexRelativeToVisibleRows(params.id) + 1;
+        }
+        if (typeof api.getRowIndex === "function") {
+          return api.getRowIndex(params.id) + 1;
+        }
+        return "";
+      },
+    },
     { field: "invoice_number", headerName: "Invoice #", flex: 1 },
     { field: "client_name", headerName: "Client", flex: 1 },
     { field: "amount", headerName: "Amount", width: 120, type: "number" },
@@ -21,15 +39,61 @@ export default function InvoicesTable({
     {
       field: "pdf_path",
       headerName: "File",
-      width: 130,
+      width: 260,
       sortable: false,
       filterable: false,
-      renderCell: (params) =>
-        params.value ? (
-          <a href={`${BASE}/invoices/${params.row.id}/pdf`} target="_blank" rel="noopener noreferrer">
-            Open PDF
-          </a>
-        ) : "—"
+      renderCell: (params) => {
+        const id = params.row.id;
+        const hasPdf = Boolean(params.value);
+        const inputId = `upload-${id}`;
+
+        return (
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {hasPdf && (
+              <a
+                href={`${BASE}/invoices/${id}/pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Open PDF
+              </a>
+            )}
+
+            <label
+              className="btn"
+              htmlFor={inputId}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {hasPdf ? "Replace" : "Upload"}
+            </label>
+            <input
+              id={inputId}
+              type="file"
+              accept="application/pdf"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                e.stopPropagation();
+                const file = e.target.files?.[0];
+                if (file) params.row.onUploadPdf?.(file);
+                e.target.value = "";
+              }}
+            />
+
+            {hasPdf && (
+              <button
+                className="btn danger"
+                onClick={(e) => {
+                  e.stopPropagation();         
+                  params.row.onRemovePdf?.();   
+                }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        );
+      },
     },
     {
       field: "actions",
